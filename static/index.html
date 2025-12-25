@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oki Doki DUO Encore Simulator</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="main-container">
+        <div id="game-container">
+            <h1>沖ドキ！DUOアンコール</h1>
+            <div id="display">
+                <div id="hibiscus-lamp">
+                    <img id="hibiscus-img" src="images/hibiscus_off.svg" alt="Hibiscus Lamp">
+                </div>
+                <div id="stats">
+                    <div class="stat-item">
+                        <span class="label">Mode</span>
+                        <span id="current-mode" class="value">--</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="label">Credits</span>
+                        <span id="credits" class="value">--</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="label">Games Since Bonus</span>
+                        <span id="games-since-bonus" class="value">--</span>
+                    </div>
+                     <div class="stat-item">
+                        <span class="label">Total Games</span>
+                        <span id="total-games" class="value">--</span>
+                    </div>
+                </div>
+            </div>
+            <div id="controls">
+                <button id="spin-button">SPIN</button>
+                <button id="skip-button">SKIP</button>
+            </div>
+            <div id="message-log">
+                 <p id="last-action-message"></p>
+            </div>
+        </div>
+
+        <div id="data-display-container">
+            <div class="chart-container">
+                <h2>Credit History</h2>
+                <canvas id="credit-chart"></canvas>
+            </div>
+            <div class="history-container">
+                <h2>Bonus History</h2>
+                <ul id="bonus-history-log">
+                    <!-- Bonus history will be populated here -->
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script src="/config.js"></script>
+    <script src="game.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

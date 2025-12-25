@@ -1,0 +1,42 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <!-- Glowing effect filter -->
+  <defs>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3.5" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Style for the flower -->
+  <style>
+    .petal {
+      fill: #ff4848; /* Bright red */
+      stroke: #ff8c00; /* Dark orange stroke */
+      stroke-width: 1;
+      filter: url(#glow);
+    }
+    .stamen-stick {
+       stroke: #ffff00; /* Bright yellow */
+       stroke-width: 1.5;
+       filter: url(#glow);
+    }
+    .stamen-top {
+      fill: #ffff00; /* Bright yellow */
+       filter: url(#glow);
+    }
+  </style>
+
+  <!-- Petals -->
+  <path class="petal" d="M 50,50 C 20,50 20,20 50,20 C 80,20 80,50 50,50 Z" transform="rotate(0 50 50)"/>
+  <path class="petal" d="M 50,50 C 20,50 20,20 50,20 C 80,20 80,50 50,50 Z" transform="rotate(72 50 50)"/>
+  <path class="petal" d="M 50,50 C 20,50 20,20 50,20 C 80,20 80,50 50,50 Z" transform="rotate(144 50 50)"/>
+  <path class="petal" d="M 50,50 C 20,50 20,20 50,20 C 80,20 80,50 50,50 Z" transform="rotate(216 50 50)"/>
+  <path class="petal" d="M 50,50 C 20,50 20,20 50,20 C 80,20 80,50 50,50 Z" transform="rotate(288 50 50)"/>
+  
+  <!-- Stamen -->
+  <line class="stamen-stick" x1="50" y1="50" x2="50" y2="25"/>
+  <circle class="stamen-top" cx="50" cy="23" r="4"/>
+</svg>

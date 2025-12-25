@@ -1,0 +1,24 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <!-- Style for the flower -->
+  <style>
+    .petal {
+      fill: #4a0e0e; /* Dark red */
+      stroke: #2c0808;
+      stroke-width: 0.5;
+    }
+    .stamen {
+      fill: #333; /* Dark grey */
+    }
+  </style>
+
+  <!-- Petals -->
+  <path class="petal" d="M 50,50 C 20,50 20,20 50,20 C 80,20 80,50 50,50 Z" transform="rotate(0 50 50)"/>
+  <path class="petal" d="M 50,50 C 20,50 20,20 50,20 C 80,20 80,50 50,50 Z" transform="rotate(72 50 50)"/>
+  <path class="petal" d="M 50,50 C 20,50 20,20 50,20 C 80,20 80,50 50,50 Z" transform="rotate(144 50 50)"/>
+  <path class="petal" d="M 50,50 C 20,50 20,20 50,20 C 80,20 80,50 50,50 Z" transform="rotate(216 50 50)"/>
+  <path class="petal" d="M 50,50 C 20,50 20,20 50,20 C 80,20 80,50 50,50 Z" transform="rotate(288 50 50)"/>
+
+  <!-- Stamen -->
+  <line x1="50" y1="50" x2="50" y2="25" stroke="#333" stroke-width="1"/>
+  <circle class="stamen" cx="50" cy="23" r="3"/>
+</svg>
