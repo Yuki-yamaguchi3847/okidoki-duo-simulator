@@ -3,258 +3,227 @@ import time
 import sys
 from collections import defaultdict
 
-# --- ゲーム定数 (Version 2.1) ---
+# --- ゲーム定数 (Version 2.3) ---
 
-# 払い出し枚数に関する定数
-MEDALS_PER_SPIN = 3  # 1ゲームあたりの投入メダル数
-BONUS_PAYOUT = {"BIG": 204, "REG": 84}  # 各ボーナスでの払い出し枚数
+MEDALS_PER_SPIN = 3
+NET_GAIN_PER_BONUS_GAME = 4.5
+BONUS_PAYOUT_PER_GAME = NET_GAIN_PER_BONUS_GAME + MEDALS_PER_SPIN
 
-# 小役の確率と払い出し枚数 (出率調整版)
+BONUS_GAMES = {"BIG": 45, "REG": 18}
+
+MIDDLE_CHERRY_PROB = 1 / 32768
 KOYAKU = {
-    "REPLAY":       {"prob": 1 / 7.2, "payout": MEDALS_PER_SPIN},  # リプレイの確率と払い出し（投入分が返ってくる）
-    "BELL":         {"prob": 1 / 8.2, "payout": 10},  # ベルの確率と払い出し
-    "WATERMELON":   {"prob": 1 / 143.7, "payout": 5},  # スイカの確率と払い出し
-    "CHERRY":       {"prob": 1 / 46.8, "payout": 3},  # チェリーの確率と払い出し（設定1の値。GameStateで上書き）
-    "GUARANTEED":   {"prob": 1 / 4369.1, "payout": 0},  # 確定役の確率。払い出しは強制当選するボーナスで行う
+    "REPLAY":       {"prob": 1 / 7.3, "payout": MEDALS_PER_SPIN},
+    "BELL":         {"prob": 1 / 12.2, "payout": 10},
+    "WATERMELON":   {"prob": 1 / 143.7, "payout": 5},
+    "CHERRY":       {"prob": 1 / 46.8, "payout": 3},
+    "GUARANTEED":   {"prob": 1 / 4369.1, "payout": 0},
+}
+ONE_G_REN_PROB = {"CHERRY": 0.02, "WATERMELON": 0.06}
+TENGOKU_UPGRADE_PROB = {
+    "CHERRY": {"DOKI": 0.05, "SUPER_DOKI": 0.0},
+    "WATERMELON": {"DOKI": 0.10, "SUPER_DOKI": 0.01},
 }
 
-# 台の設定ごとの情報
 SETTINGS = {
-    1: {"bonus_prob": 1 / 240.0, "cherry_prob": 1 / 46.8, "name": "Setting 1", "payout_rate": 0.972},
-    2: {"bonus_prob": 1 / 230.2, "cherry_prob": 1 / 45.0, "name": "Setting 2", "payout_rate": 0.986},
-    3: {"bonus_prob": 1 / 215.8, "cherry_prob": 1 / 43.3, "name": "Setting 3", "payout_rate": 1.024},
-    4: {"bonus_prob": 1 / 192.1, "cherry_prob": 1 / 41.7, "name": "Setting 5", "payout_rate": 1.068}, # 設定4は存在しない
-    5: {"bonus_prob": 1 / 192.1, "cherry_prob": 1 / 41.7, "name": "Setting 5", "payout_rate": 1.068},
-    6: {"bonus_prob": 1 / 181.0, "cherry_prob": 1 / 40.3, "name": "Setting 6", "payout_rate": 1.10},
+    1: {"bonus_prob": 1 / 240.0, "cherry_prob": 1 / 46.8, "name": "Setting 1"},
+    2: {"bonus_prob": 1 / 230.2, "cherry_prob": 1 / 45.0, "name": "Setting 2"},
+    3: {"bonus_prob": 1 / 215.8, "cherry_prob": 1 / 43.3, "name": "Setting 3"},
+    5: {"bonus_prob": 1 / 192.1, "cherry_prob": 1 / 41.7, "name": "Setting 5"},
+    6: {"bonus_prob": 1 / 181.0, "cherry_prob": 1 / 40.3, "name": "Setting 6"},
 }
 
-# ゲームモードの定義
-MODE_NORMAL_A = "Normal A"
-MODE_NORMAL_B = "Normal B"
-MODE_CHANCE = "Chance"
-MODE_TENGOKU = "Tengoku"
-MODE_DOKI_DOKI = "Doki Doki"
-MODE_SUPER_DOKI_DOKI = "Super Doki Doki"
-MODE_DUO = "DUO"
+MODE_NORMAL_A, MODE_NORMAL_B, MODE_CHANCE = "Normal A", "Normal B", "Chance"
+MODE_TENGOKU, MODE_DOKI_DOKI, MODE_SUPER_DOKI_DOKI = "Tengoku", "Doki Doki", "Super Doki Doki"
+GAME_CEILING, THROUGH_CEILING = 800, 10
 
-# 天井のゲーム数
-GAME_CEILING = 800  # ボーナス間天井
-THROUGH_CEILING = 10  # スルー回数天井
-
-# 天国モード（32G）中のゲーム数ごとのボーナス当選確率のテーブル
-TENGOKU_PROB_TABLE = [0.15] * 5 + [0.05] * 5 + [0.02] * 10 + [0.05] * 5 + [0.15] * 7
-TENGOKU_PROB_TABLE = [p / sum(TENGOKU_PROB_TABLE) * 1.1 for p in TENGOKU_PROB_TABLE]
-
-# ボーナス当選後のモード移行確率（推定値・出率調整版）
+TENGOKU_PROB_TABLE = [p / sum([0.15]*5+[0.05]*5+[0.02]*10+[0.05]*5+[0.15]*7) * 1.1 for p in [0.15]*5+[0.05]*5+[0.02]*10+[0.05]*5+[0.15]*7]
 MODE_TRANSITIONS = {
     MODE_NORMAL_A: {MODE_NORMAL_A: 0.53, MODE_NORMAL_B: 0.15, MODE_TENGOKU: 0.32},
     MODE_NORMAL_B: {MODE_NORMAL_B: 0.50, MODE_TENGOKU: 0.50},
     MODE_CHANCE:   {MODE_NORMAL_A: 0.40, MODE_TENGOKU: 0.60},
     MODE_TENGOKU:  {MODE_TENGOKU: 0.75, MODE_DOKI_DOKI: 0.05, MODE_NORMAL_A: 0.10, MODE_NORMAL_B: 0.10},
-    MODE_DOKI_DOKI:{MODE_DOKI_DOKI: 0.80, MODE_SUPER_DOKI_DOKI: 0.02, MODE_NORMAL_A: 0.09, MODE_NORMAL_B: 0.09},
-    MODE_DUO:      {MODE_DUO: 0.80, MODE_NORMAL_A: 0.20}, # 簡易的な実装
+    MODE_DOKI_DOKI:{MODE_DOKI_DOKI: 0.78, MODE_SUPER_DOKI_DOKI: 0.20, MODE_NORMAL_A: 0.01, MODE_NORMAL_B: 0.01},
+    MODE_SUPER_DOKI_DOKI: {MODE_SUPER_DOKI_DOKI: 0.94, MODE_NORMAL_A: 0.06},
 }
 
-# --- クラス定義 ---
-class Player:
-    """プレイヤーの状態を管理するクラス（インタラクティブモード用）"""
-    def __init__(self, initial_credits=1000):
-        self.credits = initial_credits
-
 class GameState:
-    """シミュレーション全体のゲーム状態を管理するクラス"""
     def __init__(self, setting_level=1, is_reset=True):
         self.setting = SETTINGS[setting_level]
         KOYAKU["CHERRY"]["prob"] = self.setting["cherry_prob"]
-        
-        self.total_games = 0
-        self.total_payout = 0
-        self.games_since_bonus = 0
-        self.bonus_count = defaultdict(int)
-        self.koyaku_counts = defaultdict(int)
-        self.bonus_through_count = 0
-        
+        self.total_games, self.total_payout, self.games_since_bonus = 0, 0, 0
+        self.bonus_count, self.koyaku_counts, self.middle_cherry_hits = defaultdict(int), defaultdict(int), 0
+        self.bonus_through_count, self.doki_doki_entries, self.super_doki_doki_entries = 0, 0, 0
+        self.is_in_bonus_at, self.bonus_games_remaining, self.queued_1g_ren, self.middle_cherry_pending = False, 0, False, False
         if is_reset:
             rand = random.random()
             if rand < 0.50: self.current_mode = MODE_NORMAL_A
             elif rand < 0.602: self.current_mode = MODE_NORMAL_B
             else: self.current_mode = MODE_CHANCE
-        else:
-            self.current_mode = MODE_NORMAL_A
+        else: self.current_mode = MODE_NORMAL_A
+    def is_tengoku(self): return self.current_mode in [MODE_TENGOKU, MODE_DOKI_DOKI, MODE_SUPER_DOKI_DOKI]
 
-    def is_tengoku(self):
-        """現在が天国系モードかどうかを判定する"""
-        return self.current_mode in [MODE_TENGOKU, MODE_DOKI_DOKI, MODE_SUPER_DOKI_DOKI]
-
-    def get_payout_rate(self):
-        """現在の出率（機械割）を計算して返す"""
-        if self.total_games == 0: return 0.0
-        return self.total_payout / (self.total_games * MEDALS_PER_SPIN)
-
-# --- コア関数 ---
-def get_mode_transition(current_mode):
-    """ボーナス当選時の次のモードを確率に応じて決定する"""
+def get_mode_transition(current_mode, source="NORMAL"):
+    if source == "MIDDLE_CHERRY":
+        rand = random.random()
+        if rand < 0.55: return MODE_SUPER_DOKI_DOKI
+        elif rand < 0.95: return MODE_DOKI_DOKI
+        else: return MODE_TENGOKU
     transitions = MODE_TRANSITIONS.get(current_mode, {MODE_NORMAL_A: 1.0})
-    rand = random.random()
-    cumulative_prob = 0
+    rand, cumulative_prob = random.random(), 0
     for mode, prob in transitions.items():
         cumulative_prob += prob
-        if rand < cumulative_prob:
-            return mode
+        if rand < cumulative_prob: return mode
     return list(transitions.keys())[-1]
 
-def play_bonus(state, bonus_type, verbose=True):
-    """ボーナス当選時の処理を行う"""
-    payout = BONUS_PAYOUT[bonus_type]
-    state.total_payout += payout
-    if verbose: print(f"🎉 {bonus_type} BONUS! Payout: {payout} 🎉")
-    
+def start_bonus(state, bonus_type, verbose=True):
     state.bonus_count[bonus_type] += 1
     state.games_since_bonus = 0
+    state.is_in_bonus_at = True
+    state.bonus_games_remaining = BONUS_GAMES[bonus_type]
 
-    new_mode = get_mode_transition(state.current_mode)
-    if new_mode != state.current_mode:
-        if verbose: print(f"Mode changed: {state.current_mode} -> {new_mode}")
+def handle_post_bonus(state, bonus_source="NORMAL", verbose=True):
+    state.is_in_bonus_at = False
+    if state.queued_1g_ren:
+        state.queued_1g_ren = False
+        start_bonus(state, "BIG", verbose)
+        return
+    previous_mode = state.current_mode
+    new_mode = get_mode_transition(previous_mode, bonus_source)
+    if new_mode == MODE_TENGOKU and bonus_source != "MIDDLE_CHERRY":
+        promo_rand = random.random()
+        if promo_rand < 0.005: new_mode = MODE_SUPER_DOKI_DOKI
+        elif promo_rand < 0.08: new_mode = MODE_DOKI_DOKI
+    if new_mode != previous_mode:
         state.current_mode = new_mode
-    
-    if state.is_tengoku():
-        state.bonus_through_count = 0
-    else:
-        state.bonus_through_count += 1
+        if new_mode == MODE_DOKI_DOKI: state.doki_doki_entries += 1
+        elif new_mode == MODE_SUPER_DOKI_DOKI: state.super_doki_doki_entries += 1
+    if state.is_tengoku(): state.bonus_through_count = 0
+    else: state.bonus_through_count += 1
 
 def spin(state, verbose=True):
-    """1ゲームの抽選処理を行う"""
     state.total_games += 1
-    state.games_since_bonus += 1
-
-    # 天国モード32G消化時のモード転落チェック
-    if state.is_tengoku() and state.games_since_bonus > 32:
-        if verbose: print("Tengoku mode finished after 32 games.")
-        state.current_mode = MODE_NORMAL_A # Aに転落
-        state.bonus_through_count = 1 # スルー回数を1に
-
     payout = 0
-    bonus_hit = False
-    
-    # 1. 天井判定
-    if state.games_since_bonus >= GAME_CEILING or state.bonus_through_count >= THROUGH_CEILING:
-        if verbose: print("Ceiling reached! Guaranteed bonus!")
-        bonus_hit = True
+    bonus_source = "NORMAL"
 
-    # 2. 天国モード中のボーナス判定
-    if not bonus_hit and state.is_tengoku() and state.games_since_bonus <= 32:
-        if random.random() < TENGOKU_PROB_TABLE[state.games_since_bonus - 1]:
-            bonus_hit = True
+    # --- 1. Bonus AT State ---
+    if state.is_in_bonus_at:
+        state.games_since_bonus = 0 # AT中は0にリセット
+        state.bonus_games_remaining -= 1
+        payout += BONUS_PAYOUT_PER_GAME
 
-    # 3. 確定役の判定
-    if not bonus_hit and random.random() < KOYAKU["GUARANTEED"]["prob"]:
-        if verbose: print("Guaranteed Win Hit!")
-        state.koyaku_counts["GUARANTEED"] += 1
-        bonus_hit = True
-
-    # 4. 通常のボーナス判定
-    if not bonus_hit and random.random() < state.setting["bonus_prob"]:
-         bonus_hit = True
-    
-    # 5. 小役の判定（ボーナス非当選時のみ）
-    if not bonus_hit:
-        rand = random.random()
-        cumulative_prob = 0
-        for name, data in KOYAKU.items():
-            if name == "GUARANTEED": continue
-            cumulative_prob += data["prob"]
+        # 1G連抽選
+        rand, cumulative_prob = random.random(), 0
+        for name in ["CHERRY", "WATERMELON"]:
+            cumulative_prob += KOYAKU[name]["prob"]
             if rand < cumulative_prob:
-                payout += data["payout"]
-                state.koyaku_counts[name] += 1
+                if random.random() < ONE_G_REN_PROB[name]:
+                    state.queued_1g_ren = True
                 break
+        
+        # ボーナス終了判定
+        if state.bonus_games_remaining <= 0:
+            handle_post_bonus(state, verbose=verbose)
+
+    # --- 2. Normal State ---
+    else:
+        state.games_since_bonus += 1
+        bonus_hit = False
+
+        # 天井判定
+        if state.is_tengoku() and state.games_since_bonus > 32:
+            state.current_mode = MODE_NORMAL_A
+            state.bonus_through_count = 1
+        if state.games_since_bonus >= GAME_CEILING or state.bonus_through_count >= THROUGH_CEILING:
+            bonus_hit = True
+        
+        # 成立役による抽選
+        if not bonus_hit:
+            # 中段チェリー
+            if random.random() < MIDDLE_CHERRY_PROB:
+                state.middle_cherry_hits += 1
+                payout += 3 # チェリーとしての払い出し
+                bonus_hit = True
+                bonus_source = "MIDDLE_CHERRY"
+            # 確定役
+            elif random.random() < KOYAKU["GUARANTEED"]["prob"]:
+                state.koyaku_counts["GUARANTEED"] += 1
+                bonus_hit = True
+            # 天国中
+            elif state.is_tengoku() and state.games_since_bonus <= 32 and random.random() < TENGOKU_PROB_TABLE[state.games_since_bonus - 1]:
+                bonus_hit = True
+            # 通常時のボーナス確率
+            else:
+                prob = state.setting["bonus_prob"]
+                # モード別確率補正 (仮)
+                if state.current_mode == MODE_NORMAL_A: prob = 1 / 280.0
+                elif state.current_mode == MODE_NORMAL_B: prob = 1 / 260.0
+                if random.random() < prob:
+                    bonus_hit = True
+        
+        # 小役の払い出し
+        if not bonus_hit:
+            rand, cumulative_prob = random.random(), 0
+            for name, data in KOYAKU.items():
+                if name == "GUARANTEED": continue
+                cumulative_prob += data["prob"]
+                if rand < cumulative_prob:
+                    payout += data["payout"]
+                    state.koyaku_counts[name] += 1
+                    # 天国中のモード昇格抽選
+                    if state.is_tengoku() and name in TENGOKU_UPGRADE_PROB:
+                        upgrade_rand = random.random()
+                        if upgrade_rand < TENGOKU_UPGRADE_PROB[name]["SUPER_DOKI"]:
+                            state.current_mode = MODE_SUPER_DOKI_DOKI
+                            state.super_doki_doki_entries += 1
+                        elif upgrade_rand < TENGOKU_UPGRADE_PROB[name]["DOKI"]:
+                            state.current_mode = MODE_DOKI_DOKI
+                            state.doki_doki_entries += 1
+                    break
+        
+        # ボーナス当選時の処理
+        if bonus_hit:
+            if state.is_tengoku():
+                big_ratio = 0.9
+            elif state.current_mode in [MODE_NORMAL_A, MODE_NORMAL_B]:
+                big_ratio = 0.6
+            else:
+                big_ratio = 0.7
+            
+            bonus_type = "BIG" if random.random() < big_ratio else "REG"
+            start_bonus(state, bonus_type, verbose)
+            # ここでボーナスゲームの1G目を消化しないように、これ以上の処理は行わない
     
     state.total_payout += payout
-
-    if bonus_hit:
-        bonus_type = "BIG" if random.random() < 0.7 else "REG"
-        play_bonus(state, bonus_type, verbose)
-        
     return payout
 
 def run_simulation(total_spins, setting_level):
-    """指定されたゲーム数だけシミュレーションを自動実行し、統計情報を表示する"""
-    print(f"--- Running simulation for {total_spins:,} games on {SETTINGS[setting_level]['name']} ---")
     state = GameState(setting_level=setting_level)
-    
     start_time = time.time()
     for i in range(total_spins):
-        if (i + 1) % 100000 == 0:
-            elapsed = time.time() - start_time
-            print(f"  ... {i+1:,} games played ({elapsed:.2f}s, Payout: {state.get_payout_rate():.4f}) ...")
+        if (i + 1) % 1000000 == 0:
+             print(f"  ... {i+1:,} games played ({time.time() - start_time:.2f}s)")
         spin(state, verbose=False)
-
-    print("\n--- Simulation Complete ---")
-    print(f"Total Games: {state.total_games:,}")
-    print(f"Total Invested: {state.total_games * MEDALS_PER_SPIN:,} medals")
-    print(f"Total Payout: {state.total_payout:,.0f} medals")
     
-    calculated_rate = state.get_payout_rate()
-    target_rate = SETTINGS[setting_level]['payout_rate']
-    print(f"\nCalculated Payout Rate: {calculated_rate:.4f} ({calculated_rate:.2%})")
-    print(f"Target Payout Rate:     {target_rate:.4f} ({target_rate:.2%})")
-    print("-" * 20)
-    print("Bonus Counts:", dict(state.bonus_count))
-    print("Koyaku Counts:", dict(state.koyaku_counts))
+    print(f"\n--- Setting {setting_level} Simulation Complete ({total_spins:,} games) ---")
+    print(f"Calculated Payout Rate: {state.total_payout / (state.total_games * MEDALS_PER_SPIN):.2%}")
+    doki_prob = state.total_games / state.doki_doki_entries if state.doki_doki_entries > 0 else 0
+    super_doki_prob = state.total_games / state.super_doki_doki_entries if state.super_doki_doki_entries > 0 else 0
+    print(f"Middle Cherry Hits: {state.middle_cherry_hits:,} (1 / {state.total_games / state.middle_cherry_hits if state.middle_cherry_hits > 0 else 0:,.0f})")
+    print(f"Doki Doki Entry: {state.doki_doki_entries:,} times (1 / {doki_prob:,.0f})")
+    print(f"Super Doki Doki Entry: {state.super_doki_doki_entries:,} times (1 / {super_doki_prob:,.0f})")
 
-def main_interactive(setting_level=1):
-    """対話形式で1ゲームずつプレイするための関数（デバッグ用）"""
-    player = Player()
-    state = GameState(setting_level=setting_level)
-    print("--- Welcome to Oki Doki DUO Encore (V2)! ---")
-    print(f"Starting with {player.credits} credits on {state.setting['name']}.")
-
-    try:
-        while player.credits >= MEDALS_PER_SPIN:
-            action = input(f"[{state.current_mode}] Cr: {player.credits} | G: {state.games_since_bonus} | Enter to spin: ")
-            if action.lower() == 'q': break
-            
-            player.credits -= MEDALS_PER_SPIN
-            payout = spin(state, verbose=True)
-            player.credits += payout
-
-            if payout > 0 and not state.bonus_count:
-                 print(f"  > Koyaku hit! Payout: {payout}")
-
-    except KeyboardInterrupt:
-        print("\nStopping game...")
-    
-    print("\n--- Game Over ---")
-    print(f"Final Credits: {player.credits}")
-    print(f"Payout Rate: {state.get_payout_rate():.4f}")
-
-# --- メイン処理 ---
 if __name__ == "__main__":
-    interactive_setting = 1 # デフォルト設定
-    
-    if len(sys.argv) > 1:
-        if sys.argv[1] == '--simulate':
-            try:
-                # 第2引数でゲーム数、第3引数で設定を指定
-                total_spins = int(sys.argv[2]) if len(sys.argv) > 2 else 1_000_000
-                setting = int(sys.argv[3]) if len(sys.argv) > 3 else 1
-                if setting not in SETTINGS:
-                    print(f"Error: Setting level {setting} not found.")
-                else:
-                    # シミュレーションモードを実行
-                    run_simulation(total_spins, setting)
-            except (ValueError, IndexError):
-                print("Usage: python simulation_runner.py --simulate [number_of_games] [setting_level]")
-            sys.exit(0)
+    try:
+        if len(sys.argv) > 1 and sys.argv[1] == '--simulate':
+            total_spins = int(sys.argv[2]) if len(sys.argv) > 2 else 10_000_000
+            setting = int(sys.argv[3]) if len(sys.argv) > 3 else 1
+            if setting not in SETTINGS:
+                raise ValueError(f"Setting level {setting} not found.")
+            run_simulation(total_spins, setting)
         else:
-            # --simulate フラグがない場合、最初の引数を設定レベルとして解釈
-            try:
-                potential_setting = int(sys.argv[1])
-                if potential_setting in SETTINGS:
-                    interactive_setting = potential_setting
-                else:
-                    print(f"Warning: Setting level {potential_setting} not found. Defaulting to Setting 1.")
-            except ValueError:
-                print(f"Warning: Invalid argument '{sys.argv[1]}'. Defaulting to Setting 1.")
-    
-    # 引数がない場合、または --simulate 以外の場合は対話モードを実行
-    main_interactive(interactive_setting)
+             print("Interactive mode is disabled. Please use simulation mode.")
+             print("Usage: python3 simulation_runner.py --simulate [games] [setting]")
+    except (ValueError, IndexError) as e:
+        print(f"Error: Invalid arguments. {e}")
+        print("Usage: python3 simulation_runner.py --simulate [games] [setting]")

@@ -32,11 +32,20 @@
                         <span class="label">Total Games</span>
                         <span id="total-games" class="value">--</span>
                     </div>
+                    <div class="stat-item">
+                        <span class="label">連荘</span>
+                        <span id="renchan-count" class="value">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="label">獲得枚数</span>
+                        <span id="renchan-payout" class="value">0</span>
+                    </div>
                 </div>
             </div>
             <div id="controls">
                 <button id="spin-button">SPIN</button>
                 <button id="skip-button">SKIP</button>
+                <button id="skip-at-button">ATスキップ</button>
             </div>
             <div id="message-log">
                  <p id="last-action-message"></p>
@@ -60,5 +69,9 @@
     <script src="/config.js"></script>
     <script src="game.js"></script>
     <script src="script.js"></script>
+
+    <div id="one-g-ren-overlay">
+        <div class="overlay-content">1G連!</div>
+    </div>
 </body>
 </html>

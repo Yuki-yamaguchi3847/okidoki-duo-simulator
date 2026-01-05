@@ -1,6 +1,7 @@
 # Project Context for Gemini Agent
 
 This document provides a summary of the `okidoki-duo-simulator` project to quickly re-establish context for future development sessions.
+**Note to Agent:** All terminal output and interactive responses from the agent will be in Japanese.
 
 ## 1. Project Overview
 
@@ -56,3 +57,23 @@ To adjust game balance and payout rates, modify the following constant objects d
 ## 6. GitHub Repository
 
 -   **URL:** `https://github.com/Yuki-yamaguchi3847/okidoki-duo-simulator`
+
+## 7. Current Development Status (As of 2026-01-05)
+
+### Issue: Extremely Low Payout Rate in Simulation
+
+A simulation of 1,000,000 games on Setting 6 resulted in a calculated payout rate of **86.59%**. This is significantly lower than the expected rate for this setting (which should be >100%), indicating a major discrepancy in the simulation parameters.
+
+### Analysis & Primary Cause
+
+An investigation into the simulation logic (`simulation_runner.py` and `static/game.js`) identified the following potential causes:
+
+1.  **[Primary Cause] Incorrect Bonus Probability:** The `spin` function contains a hardcoded override that forces the bonus probability to `1/280.0` for `Normal A` mode and `1/260.0` for `Normal B` mode. This provisional code (`(仮)`) ignores the much higher probability defined in the `SETTINGS` object for the current setting (e.g., `1/181.0` for Setting 6). This is the main reason for the extremely low number of initial bonuses and the resulting low payout rate.
+
+2.  **[Tuning Point] Low Tengoku Loop Rate:** The `MODE_TRANSITIONS` for `MODE_TENGOKU` define a 20% chance of falling out of a heaven mode after a bonus (`10% -> Normal A`, `10% -> Normal B`). This may be too high, suppressing the number of consecutive bonuses (`renchan`) and negatively impacting the payout rate. The real machine's loop rate might be higher (e.g., 85-90%).
+
+3.  **[Tuning Point] Bonus Payouts:** The net gain per bonus game (`NET_GAIN_PER_BONUS_GAME`) is set to `4.5`. This value could be reviewed against real-world data if the payout rate is still off after fixing the primary cause.
+
+### Next Steps
+
+The immediate next step is to **fix the primary cause**. This involves removing the hardcoded bonus probability overrides in both `simulation_runner.py` and `static/game.js` to ensure the probabilities from the `SETTINGS` object are used correctly. After this fix, another simulation should be run to get a more accurate payout rate.

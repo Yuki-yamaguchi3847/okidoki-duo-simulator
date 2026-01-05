@@ -87,16 +87,16 @@ h2 {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 20px;
+    gap: 10px; /* Reduced gap for 3 buttons */
 }
 
-#spin-button, #skip-button {
+#spin-button, #skip-button, #skip-at-button {
     color: white;
     border: none;
     border-radius: 10px;
-    width: 100px;
+    width: 90px; /* Reduced width for 3 buttons */
     height: 70px;
-    font-size: 1.2em;
+    font-size: 1.1em; /* Reduced font size */
     font-weight: bold;
     cursor: pointer;
     transition: background-color 0.2s, transform 0.1s, box-shadow 0.1s;
@@ -132,7 +132,24 @@ h2 {
     transform: translateY(3px);
 }
 
-#spin-button:disabled, #skip-button:disabled {
+#skip-at-button {
+    background-color: #5cb85c;
+    box-shadow: 0 5px #449d44;
+    display: none; /* Hidden by default */
+}
+
+#skip-at-button:hover {
+    background-color: #449d44;
+}
+
+#skip-at-button:active {
+    background-color: #398439;
+    box-shadow: 0 2px #449d44;
+    transform: translateY(3px);
+}
+
+
+#spin-button:disabled, #skip-button:disabled, #skip-at-button:disabled {
     background-color: #555;
     color: #aaa;
     cursor: not-allowed;
@@ -194,4 +211,47 @@ h2 {
 
 #bonus-history-log .bonus-reg {
     color: #add8e6;
+}
+
+/* --- 1G-REN Overlay --- */
+#one-g-ren-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.85);
+    color: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    font-size: 10vw; /* Responsive font size */
+    font-weight: bold;
+    text-shadow: 0 0 15px #ff00de, 0 0 25px #ff00de, 0 0 40px #ff00de;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s ease-in-out;
+    visibility: hidden;
+}
+
+#one-g-ren-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto; /* Block clicks while visible */
+}
+
+#one-g-ren-overlay .overlay-content {
+    animation: text-pop 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+
+@keyframes text-pop {
+    0% {
+        transform: scale(0.5);
+        opacity: 0.5;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
