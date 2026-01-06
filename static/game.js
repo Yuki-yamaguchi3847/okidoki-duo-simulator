@@ -215,8 +215,6 @@ function spin(state) {
             // 通常時のボーナス確率
             } else {
                 let prob = state.setting["bonus_prob"];
-                if (state.current_mode === MODE_NORMAL_A) prob = 1 / 280.0;
-                else if (state.current_mode === MODE_NORMAL_B) prob = 1 / 260.0;
                 if (Math.random() < prob) {
                     bonus_hit = true;
                 }

@@ -156,8 +156,6 @@ def spin(state, verbose=True):
             else:
                 prob = state.setting["bonus_prob"]
                 # モード別確率補正 (仮)
-                if state.current_mode == MODE_NORMAL_A: prob = 1 / 280.0
-                elif state.current_mode == MODE_NORMAL_B: prob = 1 / 260.0
                 if random.random() < prob:
                     bonus_hit = True
         
