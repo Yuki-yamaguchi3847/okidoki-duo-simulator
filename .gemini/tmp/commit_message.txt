@@ -1,0 +1,10 @@
+feat: Add terminal graph simulator and enhance simulation stats
+
+- Introduce `terminal_graph_simulator.py` for terminal-based credit history visualization.
+- Implement tracking for maximum consecutive bonus streaks (renchan) and their payouts in `terminal_graph_simulator.py`.
+- Display final medal count at the end of the simulation in `terminal_graph_simulator.py`.
+- Correct `WATERMELON` probability in `terminal_graph_simulator.py` from 1/14.7 to 1/143.7.
+- Update `README.md` to version 2.4, document `server.py`'s dynamic `config.js` generation, and remove outdated "Known Issues".
+- Update `GEMINI_CONTEXT.md` to version 2.4, reflecting the resolution of the low payout rate issue, detailing new features in `terminal_graph_simulator.py`, and noting the `WATERMELON` probability correction.
+- Provide `installation_instructions.md` and `pip_installation_guide.md` for `plotext` and `pip`.
+- Update `simulation_guidance.md` with recommendations for terminal simulator usage.
