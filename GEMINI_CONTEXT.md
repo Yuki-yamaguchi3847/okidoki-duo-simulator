@@ -1,6 +1,6 @@
 # Project Context for Gemini Agent
 
-This document provides a summary of the `okidoki-duo-simulator` project to quickly re-establish context for future development sessions.
+This document provides a summary of the `okidoki-duo-simulator` project (v2.4) to quickly re-establish context for future development sessions.
 **Note to Agent:** All terminal output and interactive responses from the agent will be in Japanese.
 
 ## 1. Project Overview
@@ -8,37 +8,41 @@ This document provides a summary of the `okidoki-duo-simulator` project to quick
 This project is a simulator for the pachislot machine "スマスロ沖ドキ！DUOアンコール". It has two main components:
 1.  A **headless simulator** (`simulation_runner.py`) for running large-scale simulations to verify the payout rate (機械割).
 2.  A **web-based UI** (`server.py` + `static/` files) for interactive, graphical play in a browser.
+3.  A **terminal-based graph simulator** (`terminal_graph_simulator.py`) for running simulations and visualizing credit history and other statistics directly in the terminal.
 
 ## 2. File Structure & Purpose
 
 -   `/` (Root Directory)
     -   `GEMINI_CONTEXT.md`: **This file.** Provides context for the Gemini agent.
     -   `README.md`: The official user-facing documentation, including specs and how-to-run instructions.
-    -   `server.py`: A simple Python web server to launch the Web UI. It accepts a setting level as a command-line argument.
-    -   `simulation_runner.py`: The Python-based headless simulator for calculating payout rates. Accepts command-line arguments for settings and game count.
+    -   `server.py`: A Python web server that launches the Web UI. It dynamically generates a `/config.js` file to pass the selected setting level to the frontend.
+    -   `simulation_runner.py`: The Python-based headless simulator. It only runs in batch simulation mode (`--simulate`); interactive mode is disabled.
+    -   `terminal_graph_simulator.py`: A Python script that runs simulations and displays credit history graphs and statistics in the terminal. Requires the `plotext` library.
 
 -   `/static/` (All frontend assets)
     -   `index.html`: The main HTML file for the UI layout.
     -   `style.css`: All CSS styles for the UI.
     -   `game.js`: **[CRITICAL]** Contains the **core game logic for the UI**, ported from Python. This includes all probabilities, mode transitions, and the `spin()` function.
     -   `script.js`: Handles UI events (button clicks), DOM manipulation, Chart.js integration, and calls functions in `game.js`.
+    -   `config.js`: **[Generated File]** This file is created dynamically by `server.py` and is not in the repository. It contains the `SETTING_LEVEL` JavaScript constant.
     -   `/images/`: Contains the SVG files for the hibiscus lamp (`hibiscus_on.svg`, `hibiscus_off.svg`).
 
 ## 3. ❗ Critical Synchronization Note
 
-The game logic exists in two separate places:
+The game logic exists in multiple places:
 1.  `simulation_runner.py` (for high-speed simulation)
 2.  `static/game.js` (for the Web UI)
+3.  `terminal_graph_simulator.py` (for terminal graph simulation)
 
-**Any changes to game mechanics, probabilities, or core logic MUST be implemented in BOTH files to keep them synchronized.** Failure to do so will result in the UI behaving differently from the simulation.
+**Any changes to game mechanics, probabilities, or core logic MUST be implemented in ALL relevant files to keep them synchronized.**
 
 ## 4. Key Logic & Tweakable Parameters
 
-To adjust game balance and payout rates, modify the following constant objects defined at the top of both `simulation_runner.py` and `static/game.js`:
+To adjust game balance and payout rates, modify the constant objects defined at the top of relevant simulation files:
 
--   `KOYAKU`: Probabilities and payouts for small wins (Bell, Replay, etc.). This primarily affects the "coin carry" (コイン持ち).
--   `SETTINGS`: Contains the base bonus probability and cherry probability for each of the 6 machine settings.
--   `MODE_TRANSITIONS`: A dictionary defining the (estimated) probabilities of moving between game modes after a bonus. This has the largest impact on the overall payout rate.
+-   `KOYAKU`: Probabilities and payouts for small wins.
+-   `SETTINGS`: Contains the base bonus probability and cherry probability for each machine setting.
+-   `MODE_TRANSITIONS`: Defines the probabilities of moving between game modes after a bonus.
 -   `TENGOKU_PROB_TABLE`: A weighted table for bonus probability during the 32 games of Tengoku mode.
 
 ## 5. Common Commands
@@ -53,27 +57,38 @@ To adjust game balance and payout rates, modify the following constant objects d
     ```bash
     python3 simulation_runner.py --simulate 1000000 1
     ```
+-   **Run the Terminal Graph Simulation (Setting 6, 10K games):**
+    ```bash
+    python3 terminal_graph_simulator.py 10000 6
+    ```
+    (Requires `plotext` library. Install with `pip install plotext`.)
 
 ## 6. GitHub Repository
 
 -   **URL:** `https://github.com/Yuki-yamaguchi3847/okidoki-duo-simulator`
 
-## 7. Current Development Status (As of 2026-01-05)
+## 7. Current Development Status (As of 2026-01-06)
 
-### Issue: Extremely Low Payout Rate in Simulation
+### Status: Payout Rate Issue Resolved
 
-A simulation of 1,000,000 games on Setting 6 resulted in a calculated payout rate of **86.59%**. This is significantly lower than the expected rate for this setting (which should be >100%), indicating a major discrepancy in the simulation parameters.
+The previous major issue causing an extremely low payout rate (e.g., ~87% on Setting 6) has been **resolved**.
 
-### Analysis & Primary Cause
+### Analysis of the Fix
 
-An investigation into the simulation logic (`simulation_runner.py` and `static/game.js`) identified the following potential causes:
+The primary cause of the low payout rate was a hardcoded bonus probability in the `spin` function of both `simulation_runner.py` and `static/game.js`. This code, intended as a temporary measure (`(仮)`), overrode the correct probabilities defined in the `SETTINGS` object.
 
-1.  **[Primary Cause] Incorrect Bonus Probability:** The `spin` function contains a hardcoded override that forces the bonus probability to `1/280.0` for `Normal A` mode and `1/260.0` for `Normal B` mode. This provisional code (`(仮)`) ignores the much higher probability defined in the `SETTINGS` object for the current setting (e.g., `1/181.0` for Setting 6). This is the main reason for the extremely low number of initial bonuses and the resulting low payout rate.
+**The fix involved removing this hardcoded logic.** The simulation now correctly uses the `bonus_prob` from the `SETTINGS` object for the selected setting level. As a result, a test simulation for Setting 6 now yields a much more realistic payout rate.
 
-2.  **[Tuning Point] Low Tengoku Loop Rate:** The `MODE_TRANSITIONS` for `MODE_TENGOKU` define a 20% chance of falling out of a heaven mode after a bonus (`10% -> Normal A`, `10% -> Normal B`). This may be too high, suppressing the number of consecutive bonuses (`renchan`) and negatively impacting the payout rate. The real machine's loop rate might be higher (e.g., 85-90%).
+### Recent Enhancements
 
-3.  **[Tuning Point] Bonus Payouts:** The net gain per bonus game (`NET_GAIN_PER_BONUS_GAME`) is set to `4.5`. This value could be reviewed against real-world data if the payout rate is still off after fixing the primary cause.
+-   **Terminal Graph Simulator:** Added `terminal_graph_simulator.py` for visualizing credit history and displaying statistics (including max renchan count/payout and final medal count) directly in the terminal.
+-   **Max Renchan Tracking:** The `terminal_graph_simulator.py` now tracks and reports the maximum consecutive bonus streak and the maximum payout obtained from a single streak.
+-   **Final Medal Count:** The `terminal_graph_simulator.py` now displays the final medal count at the end of the simulation.
+-   **`WATERMELON` Probability Correction:** Corrected a bug in `terminal_graph_simulator.py` where the `WATERMELON` probability was incorrectly set (was 1/14.7, corrected to 1/143.7).
 
 ### Next Steps
 
-The immediate next step is to **fix the primary cause**. This involves removing the hardcoded bonus probability overrides in both `simulation_runner.py` and `static/game.js` to ensure the probabilities from the `SETTINGS` object are used correctly. After this fix, another simulation should be run to get a more accurate payout rate.
+The core logic is now considered stable. Future work can focus on:
+-   Further fine-tuning of `MODE_TRANSITIONS` or other parameters to match official payout rates with even higher precision.
+-   Adding new features to the Web UI.
+-   Refactoring or code cleanup.
